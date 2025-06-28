@@ -1,0 +1,44 @@
+steps:
+# 1. Dockerイメージをビルドする
+- name: 'gcr.io/cloud-builders/docker'
+  dir: '顧客管理app'
+  args: ['build', '-t', '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA', '.']
+
+# 2. ビルドしたイメージをArtifact Registryにプッシュする
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['push', '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA']
+
+# 3. Cloud Runにデプロイする
+- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  entrypoint: gcloud
+  args:
+    - 'run'
+    - 'deploy'
+    - '$_SERVICE_NAME'
+    - '--image=$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA'
+    - '--region=$_REGION'
+    - '--platform=managed'
+    - '--allow-unauthenticated'
+    - '--service-account=streamlit-spreadsheet-access@gemini-project1214.iam.gserviceaccount.com'
+    - '--add-cloudsql-instances=$_DB_CONNECTION_NAME'
+    # ★★★ ここから修正箇所 ★★★
+    # --set-env-vars を削除し、--update-env-vars で各変数を個別に設定
+    - '--update-env-vars=DB_NAME=$_DB_NAME'
+    - '--update-env-vars=DB_USER=$_DB_USER'
+    - '--update-env-vars=DB_PASS=$_DB_PASS'
+    - '--update-env-vars=DB_CONNECTION_NAME=$_DB_CONNECTION_NAME'
+    - '--update-env-vars=_SMTP_USER=$_SMTP_USER'
+    - '--update-env-vars=_SMTP_PASSWORD=$_SMTP_PASSWORD'
+    - '--update-env-vars=_ADMIN_EMAIL=$_ADMIN_EMAIL'
+    - '--update-env-vars=ADMIN_USERNAME=$_ADMIN_USERNAME'
+    - '--update-env-vars=ADMIN_PASSWORD_HASH=$_ADMIN_PASSWORD_HASH'
+    - '--update-env-vars=GCS_BUCKET_NAME=$_GCS_BUCKET_NAME' # GCSバケット名を追加
+    # ★★★ ここまで修正箇所 ★★★
+
+images:
+- '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA'
+
+timeout: '1200s'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
